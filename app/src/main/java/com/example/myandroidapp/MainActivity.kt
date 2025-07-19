@@ -3,9 +3,12 @@ package com.example.myandroidapp
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -31,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     
     // 코루틴을 사용한 UI 업데이트
     private var updateJob: Job? = null
+    private var updateInterval: Long = SettingsActivity.INTERVAL_1_SECOND
     
     // Activity Result API for Bluetooth enable
     private val bluetoothEnableLauncher = registerForActivityResult(
@@ -40,6 +44,27 @@ class MainActivity : AppCompatActivity() {
             showToast("블루투스가 활성화되었습니다")
         } else {
             showToast("블루투스 활성화가 거부되었습니다")
+        }
+    }
+    
+    // Activity Result API for Settings
+    private val settingsLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == SettingsActivity.RESULT_UPDATE_INTERVAL_CHANGED) {
+            val newInterval = result.data?.getLongExtra(
+                SettingsActivity.EXTRA_UPDATE_INTERVAL, 
+                SettingsActivity.INTERVAL_1_SECOND
+            ) ?: SettingsActivity.INTERVAL_1_SECOND
+            
+            updateInterval = newInterval
+            showToast("업데이트 주기가 변경되었습니다")
+            
+            // 스캔 중이면 코루틴 재시작
+            if (bleScanner.isScanning()) {
+                stopPeriodicUpdate()
+                startPeriodicUpdate()
+            }
         }
     }
 
@@ -58,9 +83,14 @@ class MainActivity : AppCompatActivity() {
         permissionHelper = PermissionHelper(this)
         deviceAdapter = DeviceAdapter()
         
-        // BLE 스캐너 콜백 설정 (실시간 UI 업데이트 제거)
+        // BLE 스캐너 콜백 설정
         bleScanner.onDeviceDiscovered = { _ ->
-            // 기기 발견 시 UI 업데이트하지 않음 (코루틴에서 1초마다 처리)
+            // 실시간 모드일 때만 즉시 업데이트
+            if (updateInterval == SettingsActivity.INTERVAL_REALTIME) {
+                runOnUiThread {
+                    updateDeviceList()
+                }
+            }
         }
         
         bleScanner.onScanStarted = {
@@ -140,10 +170,15 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun startPeriodicUpdate() {
+        // 실시간 모드면 코루틴 시작하지 않음
+        if (updateInterval == SettingsActivity.INTERVAL_REALTIME) {
+            return
+        }
+        
         updateJob = lifecycleScope.launch {
             while (isActive) {
                 updateDeviceList()
-                delay(1000) // 1초마다 업데이트
+                delay(updateInterval) // 설정된 주기마다 업데이트
             }
         }
     }
@@ -208,6 +243,28 @@ class MainActivity : AppCompatActivity() {
     }
     
 
+    
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return true
+    }
+    
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_settings -> {
+                openSettings()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+    
+    private fun openSettings() {
+        val intent = Intent(this, SettingsActivity::class.java).apply {
+            putExtra(SettingsActivity.EXTRA_UPDATE_INTERVAL, updateInterval)
+        }
+        settingsLauncher.launch(intent)
+    }
     
     override fun onDestroy() {
         super.onDestroy()
