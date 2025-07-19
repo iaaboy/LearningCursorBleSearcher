@@ -11,8 +11,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.myandroidapp.databinding.ActivityMainBinding
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     
@@ -23,6 +28,9 @@ class MainActivity : AppCompatActivity() {
     
     private val bluetoothManager: BluetoothManager by lazy { getSystemService(BLUETOOTH_SERVICE) as BluetoothManager }
     private val bluetoothAdapter: BluetoothAdapter? by lazy { bluetoothManager.adapter }
+    
+    // 코루틴을 사용한 UI 업데이트
+    private var updateJob: Job? = null
     
     // Activity Result API for Bluetooth enable
     private val bluetoothEnableLauncher = registerForActivityResult(
@@ -50,17 +58,16 @@ class MainActivity : AppCompatActivity() {
         permissionHelper = PermissionHelper(this)
         deviceAdapter = DeviceAdapter()
         
-        // BLE 스캐너 콜백 설정
+        // BLE 스캐너 콜백 설정 (실시간 UI 업데이트 제거)
         bleScanner.onDeviceDiscovered = { _ ->
-            runOnUiThread {
-                updateDeviceList()
-            }
+            // 기기 발견 시 UI 업데이트하지 않음 (코루틴에서 1초마다 처리)
         }
         
         bleScanner.onScanStarted = {
             runOnUiThread {
                 updateScanButton(true)
                 showToast("BLE 스캔 시작됨")
+                startPeriodicUpdate() // 코루틴 시작
             }
         }
         
@@ -68,6 +75,7 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 updateScanButton(false)
                 showToast("BLE 스캔 중지됨")
+                stopPeriodicUpdate() // 코루틴 중지
             }
         }
         
@@ -131,6 +139,20 @@ class MainActivity : AppCompatActivity() {
         binding.deviceCountText.text = "발견된 기기: ${devices.size}개"
     }
     
+    private fun startPeriodicUpdate() {
+        updateJob = lifecycleScope.launch {
+            while (isActive) {
+                updateDeviceList()
+                delay(1000) // 1초마다 업데이트
+            }
+        }
+    }
+    
+    private fun stopPeriodicUpdate() {
+        updateJob?.cancel()
+        updateJob = null
+    }
+    
     private fun updateScanButton(isScanning: Boolean) {
         binding.scanButton.text = if (isScanning) "스캔 중지" else "스캔 시작"
         binding.scanButton.isEnabled = true
@@ -189,6 +211,7 @@ class MainActivity : AppCompatActivity() {
     
     override fun onDestroy() {
         super.onDestroy()
+        stopPeriodicUpdate() // 코루틴 정리
         bleScanner.stopScan()
     }
 } 
