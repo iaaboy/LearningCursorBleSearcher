@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">BLE 기기 스캐너</string>
+    <string name="app_title">BLE 기기 스캐너</string>
+    <string name="scan_start">스캔 시작</string>
+    <string name="scan_stop">스캔 중지</string>
+    <string name="clear_devices">클리어</string>
+    <string name="devices_found">발견된 기기: %d개</string>
+    <string name="permission_required">권한 필요</string>
+    <string name="location_permission_message">BLE 스캔을 위해 위치 권한이 필요합니다.</string>
+    <string name="request_permission">권한 요청</string>
+    <string name="cancel">취소</string>
+    <string name="bluetooth_disabled">블루투스 비활성화</string>
+    <string name="bluetooth_enable_message">BLE 스캔을 위해 블루투스를 활성화해야 합니다.</string>
+    <string name="enable">활성화</string>
+    <string name="scan_started">BLE 스캔 시작됨</string>
+    <string name="scan_stopped">BLE 스캔 중지됨</string>
+    <string name="devices_cleared">기기 목록이 클리어되었습니다</string>
+    <string name="permission_granted">권한이 승인되었습니다</string>
+    <string name="permission_denied">권한이 거부되었습니다. 앱 설정에서 권한을 허용해주세요.</string>
+    <string name="bluetooth_enabled">블루투스가 활성화되었습니다</string>
+    <string name="bluetooth_enable_denied">블루투스 활성화가 거부되었습니다</string>
+    <string name="error_prefix">오류: %s</string>
+</resources> 
