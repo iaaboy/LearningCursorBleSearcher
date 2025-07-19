@@ -37,11 +37,11 @@ data class BleDevice(
     
     fun getSignalStrengthColor(): Int {
         return when {
-            rssi >= -50 -> android.graphics.Color.GREEN
-            rssi >= -60 -> android.graphics.Color.rgb(0, 150, 0)
-            rssi >= -70 -> android.graphics.Color.YELLOW
-            rssi >= -80 -> android.graphics.Color.rgb(255, 165, 0)
-            else -> android.graphics.Color.RED
+            rssi >= -50 -> android.graphics.Color.rgb(0, 128, 0)  // 진한 녹색
+            rssi >= -60 -> android.graphics.Color.rgb(34, 139, 34)  // Forest Green
+            rssi >= -70 -> android.graphics.Color.rgb(255, 140, 0)  // 진한 주황색
+            rssi >= -80 -> android.graphics.Color.rgb(255, 69, 0)   // Red Orange
+            else -> android.graphics.Color.rgb(220, 20, 60)         // Crimson
         }
     }
 } 

@@ -40,6 +40,7 @@ class DeviceAdapter : RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder>() {
             
             val timeString = dateFormat.format(Date(device.lastSeen))
             text2.text = "RSSI: ${device.rssi} dBm (${device.getSignalStrength()})\nLast seen: $timeString"
+            text2.setTextColor(android.graphics.Color.rgb(33, 33, 33)) // 진한 회색으로 변경
         }
     }
 } 
