@@ -20,7 +20,7 @@ class DeviceAdapter : RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder>() {
     
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DeviceViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(android.R.layout.simple_list_item_2, parent, false)
+            .inflate(R.layout.item_device, parent, false)
         return DeviceViewHolder(view)
     }
     
@@ -31,16 +31,30 @@ class DeviceAdapter : RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder>() {
     override fun getItemCount(): Int = devices.size
     
     inner class DeviceViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val text1: TextView = itemView.findViewById(android.R.id.text1)
-        private val text2: TextView = itemView.findViewById(android.R.id.text2)
+        private val deviceName: TextView = itemView.findViewById(R.id.deviceName)
+        private val companyInfo: TextView = itemView.findViewById(R.id.companyInfo)
+        private val manufacturerData: TextView = itemView.findViewById(R.id.manufacturerData)
+        private val lastSeen: TextView = itemView.findViewById(R.id.lastSeen)
+        private val rssiText: TextView = itemView.findViewById(R.id.rssiText)
         
         fun bind(device: BleDevice) {
-            text1.text = "${device.name}\n${device.address}"
-            text1.setTextColor(device.getSignalStrengthColor())
+            // 기기명과 MAC 주소를 함께 표시 (신호 강도에 따른 색상 적용)
+            deviceName.text = "${device.name} (${device.address})"
+            deviceName.setTextColor(device.getSignalStrengthColor())
             
+            // Company 정보
+            companyInfo.text = "Company: ${device.getCompanyName()}"
+            
+            // Manufacturer Data (16진수로 표시)
+            manufacturerData.text = "Manufacturer Data: ${device.getManufacturerDataHex()}"
+            
+            // 마지막 감지 시간
             val timeString = dateFormat.format(Date(device.lastSeen))
-            text2.text = "RSSI: ${device.rssi} dBm (${device.getSignalStrength()})\nLast seen: $timeString"
-            text2.setTextColor(android.graphics.Color.rgb(33, 33, 33)) // 진한 회색으로 변경
+            lastSeen.text = "Last seen: $timeString"
+            
+            // RSSI 정보
+            rssiText.text = "${device.rssi} dBm (${device.getSignalStrength()})"
+            rssiText.setTextColor(device.getSignalStrengthColor())
         }
     }
 } 

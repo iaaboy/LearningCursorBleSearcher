@@ -6,9 +6,12 @@
 
 - **실시간 BLE 스캔**: 주변의 모든 BLE 기기 감지
 - **기기 정보 표시**: 기기명, MAC 주소, 신호 강도(RSSI), 마지막 감지 시간
+- **Company ID 표시**: 제조사 식별자와 회사명 표시
+- **Manufacturer Data 표시**: 제조사별 고유 데이터 (16진수)
 - **신호 강도 시각화**: 색상으로 신호 강도 표시 (Excellent/Good/Fair/Poor/Very Poor)
 - **권한 관리**: 런타임 권한 요청 및 블루투스 활성화
 - **한국어 UI**: 완전한 한국어 인터페이스
+- **설정 화면**: 업데이트 주기 설정 (실시간/1초/3초/5초)
 
 ## 프로젝트 구조
 
@@ -24,10 +27,16 @@ MyAndroidApp/
 │       │   ├── BleDevice.kt        # BLE 기기 데이터 모델
 │       │   ├── BleScanner.kt       # BLE 스캔 로직
 │       │   ├── DeviceAdapter.kt    # RecyclerView 어댑터
-│       │   └── PermissionHelper.kt # 권한 관리 헬퍼
+│       │   ├── PermissionHelper.kt # 권한 관리 헬퍼
+│       │   ├── SettingsActivity.kt # 설정 화면
+│       │   └── CompanyId.kt        # Company ID enum
 │       └── res/
 │           ├── layout/
-│           │   └── activity_main.xml    # 메인 UI 레이아웃
+│           │   ├── activity_main.xml    # 메인 UI 레이아웃
+│           │   ├── activity_settings.xml # 설정 화면 레이아웃
+│           │   └── item_device.xml      # 기기 목록 아이템 레이아웃
+│           ├── menu/
+│           │   └── main_menu.xml        # 메인 메뉴
 │           ├── values/
 │           │   ├── colors.xml           # 색상 정의
 │           │   ├── strings.xml          # 한국어 문자열
@@ -98,13 +107,36 @@ cd MyAndroidApp
 ### 기기 정보 표시
 - **기기명**: 기기의 이름 (Unknown Device if null)
 - **MAC 주소**: 기기의 고유 주소
+- **Company ID**: 제조사 식별자와 회사명
+- **Manufacturer Data**: 제조사별 고유 데이터 (16진수)
 - **신호 강도**: RSSI 값과 색상 표시
 - **마지막 감지 시간**: 기기를 마지막으로 감지한 시간
+
+### Company ID 지원
+앱은 다음과 같은 주요 제조사들의 Company ID를 지원합니다:
+- **Apple** (0x004C)
+- **Microsoft** (0x0006)
+- **Samsung** (0x0018, 0x0038)
+- **Google** (0x002C)
+- **Huawei** (0x003E)
+- **HTC** (0x003C)
+- **Qualcomm** (0x0033)
+- **MediaTek** (0x002E)
+- **Nordic Semiconductor** (0x0030)
+- **Silicon Labs** (0x0034)
+- 기타 200+ 제조사 지원
 
 ### 권한 관리
 - **위치 권한**: BLE 스캔에 필수
 - **블루투스 권한**: Android 12+ 에서 필요
 - **블루투스 활성화**: 자동 블루투스 활성화 요청
+
+### 설정 기능
+- **업데이트 주기 설정**:
+  - 실시간 (기기 발견 시마다)
+  - 1초마다
+  - 3초마다
+  - 5초마다
 
 ## 사용된 기술
 
@@ -115,6 +147,7 @@ cd MyAndroidApp
 - **ConstraintLayout**: 유연한 레이아웃 시스템
 - **RecyclerView**: 효율적인 리스트 표시
 - **BLE API**: Bluetooth Low Energy 스캔
+- **Enum Classes**: Company ID 관리
 
 ## 커스터마이징
 
@@ -122,8 +155,9 @@ cd MyAndroidApp
 
 1. **색상 변경**: `app/src/main/res/values/colors.xml` 편집
 2. **텍스트 수정**: `app/src/main/res/values/strings.xml` 편집
-3. **UI 업데이트**: `app/src/main/res/layout/activity_main.xml` 편집
+3. **UI 업데이트**: `app/src/main/res/layout/` 폴더의 레이아웃 파일 편집
 4. **기능 추가**: `MainActivity.kt` 또는 관련 클래스 수정
+5. **Company ID 추가**: `CompanyId.kt` enum에 새로운 제조사 추가
 
 ## 라이선스
 
