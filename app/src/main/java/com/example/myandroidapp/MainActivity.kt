@@ -6,11 +6,15 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import java.io.File
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.Button
+import android.widget.EditText
+import android.widget.RadioGroup
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -42,6 +46,12 @@ class MainActivity : AppCompatActivity() {
     // 필터링 관련 변수들
     private var allDeviceGroups: List<DeviceGroup> = emptyList()
     private var selectedCompanies: Set<String> = emptySet()
+    
+    // 파일 저장 관련 변수들
+    private lateinit var bleDataExporter: BleDataExporter
+    private lateinit var savedFileManager: SavedFileManager
+    
+
     
     // Activity Result API for Bluetooth enable
     private val bluetoothEnableLauncher = registerForActivityResult(
@@ -89,6 +99,8 @@ class MainActivity : AppCompatActivity() {
         bleScanner = BleScanner(this)
         permissionHelper = PermissionHelper(this)
         deviceAdapter = GroupedDeviceAdapter()
+        bleDataExporter = BleDataExporter(this)
+        savedFileManager = SavedFileManager(this)
         
         // BLE 스캐너 콜백 설정
         bleScanner.onDeviceDiscovered = { _ ->
@@ -332,6 +344,175 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
     
+    private fun showSaveFileDialog() {
+        val devices = bleScanner.getDiscoveredDevices()
+        if (devices.isEmpty()) {
+            showToast("저장할 기기가 없습니다")
+            return
+        }
+        
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_save_file, null)
+        val formatRadioGroup = dialogView.findViewById<RadioGroup>(R.id.formatRadioGroup)
+        val dataRadioGroup = dialogView.findViewById<RadioGroup>(R.id.dataRadioGroup)
+        val filenameEditText = dialogView.findViewById<EditText>(R.id.filenameEditText)
+        
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setPositiveButton("저장") { _, _ ->
+                val format = when (formatRadioGroup.checkedRadioButtonId) {
+                    R.id.radioCsv -> BleDataExporter.ExportFormat.CSV
+                    R.id.radioJson -> BleDataExporter.ExportFormat.JSON
+                    R.id.radioTxt -> BleDataExporter.ExportFormat.TXT
+                    else -> BleDataExporter.ExportFormat.CSV
+                }
+                
+                val isGrouped = dataRadioGroup.checkedRadioButtonId == R.id.radioGroupedDevices
+                val filename = filenameEditText.text.toString().takeIf { it.isNotEmpty() }
+                
+                saveBleData(format, isGrouped, filename)
+            }
+            .setNegativeButton("취소", null)
+            .create()
+        
+        dialog.show()
+    }
+    
+    private fun saveBleData(
+        format: BleDataExporter.ExportFormat,
+        isGrouped: Boolean,
+        filename: String?
+    ) {
+        try {
+            val file = if (isGrouped) {
+                bleDataExporter.exportGroupedBleData(allDeviceGroups, format, filename)
+            } else {
+                val devices = bleScanner.getDiscoveredDevices()
+                bleDataExporter.exportBleData(devices, format, filename)
+            }
+            
+            if (file != null) {
+                showFileSavedDialog(file)
+            } else {
+                showToast("파일 저장에 실패했습니다")
+            }
+        } catch (e: Exception) {
+            showToast("파일 저장 중 오류가 발생했습니다: ${e.message}")
+        }
+    }
+    
+    private fun showFileSavedDialog(file: File) {
+        AlertDialog.Builder(this)
+            .setTitle("파일 저장 완료")
+            .setMessage("파일이 저장되었습니다: ${file.name}\n\n파일을 공유하시겠습니까?")
+            .setPositiveButton("공유") { _, _ ->
+                shareFile(file)
+            }
+            .setNegativeButton("확인", null)
+            .show()
+    }
+    
+    private fun shareFile(file: File) {
+        try {
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                "${packageName}.fileprovider",
+                file
+            )
+            
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = when {
+                    file.name.endsWith(".csv") -> "text/csv"
+                    file.name.endsWith(".json") -> "application/json"
+                    file.name.endsWith(".txt") -> "text/plain"
+                    else -> "*/*"
+                }
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "BLE 스캔 결과")
+                putExtra(Intent.EXTRA_TEXT, "BLE 스캔 결과 파일입니다.")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            
+            startActivity(Intent.createChooser(shareIntent, "파일 공유"))
+        } catch (e: Exception) {
+            showToast("파일 공유 중 오류가 발생했습니다: ${e.message}")
+        }
+    }
+    
+    private fun showSavedFilesDialog() {
+        val savedFiles = savedFileManager.getSavedFiles()
+        
+        if (savedFiles.isEmpty()) {
+            showToast("저장된 파일이 없습니다")
+            return
+        }
+        
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_saved_files, null)
+        val fileCountText = dialogView.findViewById<TextView>(R.id.fileCountText)
+        val savedFilesList = dialogView.findViewById<RecyclerView>(R.id.savedFilesList)
+        
+        fileCountText.text = "저장된 파일: ${savedFiles.size}개"
+        
+        val fileAdapter = SavedFileAdapter(
+            files = savedFiles,
+            onFileClick = { file -> showFileContentDialog(file) },
+            onFileLongClick = { file -> showDeleteFileDialog(file) }
+        )
+        
+        savedFilesList.layoutManager = LinearLayoutManager(this)
+        savedFilesList.adapter = fileAdapter
+        
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setPositiveButton("닫기", null)
+            .create()
+        
+        dialog.show()
+    }
+    
+    private fun showFileContentDialog(file: SavedFile) {
+        val content = savedFileManager.getFileContent(file)
+        
+        if (content == null) {
+            showToast("파일을 읽을 수 없습니다")
+            return
+        }
+        
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_file_content, null)
+        val fileTitle = dialogView.findViewById<TextView>(R.id.fileTitle)
+        val fileContent = dialogView.findViewById<TextView>(R.id.fileContent)
+        
+        fileTitle.text = file.displayName
+        fileContent.text = content
+        
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setPositiveButton("공유") { _, _ -> shareFile(file.file) }
+            .setNegativeButton("닫기", null)
+            .create()
+        
+        dialog.show()
+    }
+    
+    private fun showDeleteFileDialog(file: SavedFile): Boolean {
+        AlertDialog.Builder(this)
+            .setTitle("파일 삭제")
+            .setMessage("'${file.displayName}' 파일을 삭제하시겠습니까?")
+            .setPositiveButton("삭제") { _, _ ->
+                if (savedFileManager.deleteFile(file)) {
+                    showToast("파일이 삭제되었습니다")
+                    // 저장된 파일 목록 다이얼로그가 열려있다면 새로고침
+                    showSavedFilesDialog()
+                } else {
+                    showToast("파일 삭제에 실패했습니다")
+                }
+            }
+            .setNegativeButton("취소", null)
+            .show()
+        return true
+    }
+    
+
+    
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -339,12 +520,15 @@ class MainActivity : AppCompatActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         
-        if (requestCode == PermissionHelper.PERMISSION_REQUEST_CODE) {
-            if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                showToast("권한이 승인되었습니다")
-            } else {
-                showToast("권한이 거부되었습니다. 앱 설정에서 권한을 허용해주세요.")
+        when (requestCode) {
+            PermissionHelper.PERMISSION_REQUEST_CODE -> {
+                if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                    showToast("권한이 승인되었습니다")
+                } else {
+                    showToast("권한이 거부되었습니다. 앱 설정에서 권한을 허용해주세요.")
+                }
             }
+
         }
     }
     
@@ -359,6 +543,14 @@ class MainActivity : AppCompatActivity() {
         return when (item.itemId) {
             R.id.action_settings -> {
                 openSettings()
+                true
+            }
+            R.id.action_save -> {
+                showSaveFileDialog()
+                true
+            }
+            R.id.action_saved_files -> {
+                showSavedFilesDialog()
                 true
             }
             else -> super.onOptionsItemSelected(item)

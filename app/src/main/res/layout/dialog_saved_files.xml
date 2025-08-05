@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="저장된 파일"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@color/primary_color"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:id="@+id/fileCountText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="저장된 파일: 0개"
+        android:textSize="14sp"
+        android:textColor="@color/secondary_text"
+        android:layout_marginBottom="12dp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/savedFilesList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="400dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="• 파일을 터치하면 내용을 볼 수 있습니다\n• 파일을 길게 누르면 삭제할 수 있습니다"
+        android:textSize="12sp"
+        android:textColor="@color/secondary_text"
+        android:layout_marginTop="12dp" />
+
+</LinearLayout> 
