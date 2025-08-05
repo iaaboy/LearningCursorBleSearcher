@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/white"
+    android:layout_marginBottom="8dp">
+
+    <!-- 그룹 헤더 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:background="@color/primary_light">
+
+        <TextView
+            android:id="@+id/groupHeader"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/primary_dark" />
+
+        <TextView
+            android:id="@+id/deviceCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="@color/primary_dark"
+            android:background="@drawable/device_count_background"
+            android:padding="4dp"
+            android:layout_marginStart="8dp" />
+
+    </LinearLayout>
+
+    <!-- 기기 목록 -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/devicesRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:nestedScrollingEnabled="false" />
+
+</LinearLayout> 

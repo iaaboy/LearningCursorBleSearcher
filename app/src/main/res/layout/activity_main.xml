@@ -53,8 +53,21 @@
         android:padding="16dp"
         app:cornerRadius="8dp"
         style="@style/Widget.Material3.Button.OutlinedButton"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/filterButton"
         app:layout_constraintStart_toEndOf="@+id/scanButton"
+        app:layout_constraintTop_toTopOf="@+id/scanButton" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/filterButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="필터"
+        android:layout_marginStart="8dp"
+        android:padding="16dp"
+        app:cornerRadius="8dp"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/clearButton"
         app:layout_constraintTop_toTopOf="@+id/scanButton" />
 
     <androidx.recyclerview.widget.RecyclerView

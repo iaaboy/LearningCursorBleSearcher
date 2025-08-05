@@ -7,8 +7,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
+import android.widget.Button
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -16,6 +18,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.example.myandroidapp.databinding.ActivityMainBinding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -27,7 +30,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var bleScanner: BleScanner
     private lateinit var permissionHelper: PermissionHelper
-    private lateinit var deviceAdapter: DeviceAdapter
+    private lateinit var deviceAdapter: GroupedDeviceAdapter
     
     private val bluetoothManager: BluetoothManager by lazy { getSystemService(BLUETOOTH_SERVICE) as BluetoothManager }
     private val bluetoothAdapter: BluetoothAdapter? by lazy { bluetoothManager.adapter }
@@ -35,6 +38,10 @@ class MainActivity : AppCompatActivity() {
     // 코루틴을 사용한 UI 업데이트
     private var updateJob: Job? = null
     private var updateInterval: Long = SettingsActivity.INTERVAL_1_SECOND
+    
+    // 필터링 관련 변수들
+    private var allDeviceGroups: List<DeviceGroup> = emptyList()
+    private var selectedCompanies: Set<String> = emptySet()
     
     // Activity Result API for Bluetooth enable
     private val bluetoothEnableLauncher = registerForActivityResult(
@@ -81,7 +88,7 @@ class MainActivity : AppCompatActivity() {
     private fun initializeComponents() {
         bleScanner = BleScanner(this)
         permissionHelper = PermissionHelper(this)
-        deviceAdapter = DeviceAdapter()
+        deviceAdapter = GroupedDeviceAdapter()
         
         // BLE 스캐너 콜백 설정
         bleScanner.onDeviceDiscovered = { _ ->
@@ -141,6 +148,11 @@ class MainActivity : AppCompatActivity() {
             showToast("기기 목록이 클리어되었습니다")
         }
         
+        // 필터 버튼 설정
+        binding.filterButton.setOnClickListener {
+            showCompanyFilterDialog()
+        }
+        
         // 초기 상태 설정
         updateScanButton(false)
     }
@@ -165,8 +177,42 @@ class MainActivity : AppCompatActivity() {
     
     private fun updateDeviceList() {
         val devices = bleScanner.getDiscoveredDevices()
-        deviceAdapter.updateDevices(devices)
-        binding.deviceCountText.text = "발견된 기기: ${devices.size}개"
+        allDeviceGroups = groupDevicesByCompany(devices)
+        
+        // 필터링 적용
+        val filteredGroups = if (selectedCompanies.isEmpty()) {
+            allDeviceGroups
+        } else {
+            allDeviceGroups.filter { group ->
+                selectedCompanies.contains(group.companyName)
+            }
+        }
+        
+        deviceAdapter.updateDeviceGroups(filteredGroups)
+        
+        val totalDevices = devices.size
+        val totalCompanies = allDeviceGroups.size
+        val filteredDevices = filteredGroups.sumOf { it.deviceCount }
+        val filteredCompanies = filteredGroups.size
+        
+        if (selectedCompanies.isEmpty()) {
+            binding.deviceCountText.text = "발견된 기기: ${totalDevices}개 (${totalCompanies}개 회사)"
+        } else {
+            binding.deviceCountText.text = "표시된 기기: ${filteredDevices}개 (${filteredCompanies}개 회사) / 전체: ${totalDevices}개"
+        }
+    }
+    
+    private fun groupDevicesByCompany(devices: List<BleDevice>): List<DeviceGroup> {
+        return devices.groupBy { device ->
+            device.getCompanyName()
+        }.map { (companyName, deviceList) ->
+            val firstDevice = deviceList.first()
+            DeviceGroup(
+                companyName = companyName,
+                companyId = firstDevice.companyId,
+                devices = deviceList.sortedByDescending { it.rssi } // 신호 강도 순으로 정렬
+            )
+        }.sortedByDescending { it.deviceCount } // 기기 개수 순으로 정렬
     }
     
     private fun startPeriodicUpdate() {
@@ -224,6 +270,66 @@ class MainActivity : AppCompatActivity() {
     
     private fun showToast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+    
+    private fun showCompanyFilterDialog() {
+        if (allDeviceGroups.isEmpty()) {
+            showToast("표시할 기기가 없습니다")
+            return
+        }
+        
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_company_filter, null)
+        val companyList = dialogView.findViewById<RecyclerView>(R.id.companyList)
+        val selectAllButton = dialogView.findViewById<Button>(R.id.selectAllButton)
+        val clearSelectionButton = dialogView.findViewById<Button>(R.id.clearSelectionButton)
+        
+        // 회사 필터 목록 생성
+        val companyFilters = allDeviceGroups.map { group ->
+            CompanyFilter(
+                companyName = group.companyName,
+                companyId = group.companyId,
+                deviceCount = group.deviceCount,
+                isSelected = selectedCompanies.isEmpty() || selectedCompanies.contains(group.companyName)
+            )
+        }
+        
+        // 어댑터 설정
+        val filterAdapter = CompanyFilterAdapter(companyFilters) { company, isSelected ->
+            if (isSelected) {
+                selectedCompanies = selectedCompanies + company.companyName
+            } else {
+                selectedCompanies = selectedCompanies - company.companyName
+            }
+        }
+        
+        companyList.layoutManager = LinearLayoutManager(this)
+        companyList.adapter = filterAdapter
+        
+        // 전체 선택 버튼
+        selectAllButton.setOnClickListener {
+            selectedCompanies = allDeviceGroups.map { it.companyName }.toSet()
+            filterAdapter.updateCompanies(companyFilters.map { it.copy(isSelected = true) })
+        }
+        
+        // 선택 해제 버튼
+        clearSelectionButton.setOnClickListener {
+            selectedCompanies = emptySet()
+            filterAdapter.updateCompanies(companyFilters.map { it.copy(isSelected = false) })
+        }
+        
+        // 다이얼로그 생성
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setPositiveButton("적용") { _, _ ->
+                updateDeviceList()
+                showToast("필터가 적용되었습니다")
+            }
+            .setNegativeButton("취소") { _, _ ->
+                // 변경사항 취소
+            }
+            .create()
+        
+        dialog.show()
     }
     
     override fun onRequestPermissionsResult(
