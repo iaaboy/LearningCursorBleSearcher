@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@color/table_header_background"
+    android:padding="12dp">
+
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="3"
+        android:text="파일명"
+        android:textStyle="bold"
+        android:textColor="@color/table_header_text"
+        android:textSize="14sp"
+        android:paddingEnd="8dp" />
+
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="형식"
+        android:textStyle="bold"
+        android:textColor="@color/table_header_text"
+        android:textSize="14sp"
+        android:paddingEnd="8dp"
+        android:gravity="center" />
+
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="크기"
+        android:textStyle="bold"
+        android:textColor="@color/table_header_text"
+        android:textSize="14sp"
+        android:paddingEnd="8dp"
+        android:gravity="center" />
+
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="2"
+        android:text="저장 시간"
+        android:textStyle="bold"
+        android:textColor="@color/table_header_text"
+        android:textSize="14sp"
+        android:gravity="center" />
+
+</LinearLayout>

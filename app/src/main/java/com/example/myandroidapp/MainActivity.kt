@@ -16,6 +16,8 @@ import android.widget.EditText
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.ScrollView
+import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -35,6 +37,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bleScanner: BleScanner
     private lateinit var permissionHelper: PermissionHelper
     private lateinit var deviceAdapter: GroupedDeviceAdapter
+    private lateinit var tableDeviceAdapter: TableDeviceAdapter
+    private var isTableView = false
     
     private val bluetoothManager: BluetoothManager by lazy { getSystemService(BLUETOOTH_SERVICE) as BluetoothManager }
     private val bluetoothAdapter: BluetoothAdapter? by lazy { bluetoothManager.adapter }
@@ -99,6 +103,7 @@ class MainActivity : AppCompatActivity() {
         bleScanner = BleScanner(this)
         permissionHelper = PermissionHelper(this)
         deviceAdapter = GroupedDeviceAdapter()
+        tableDeviceAdapter = TableDeviceAdapter()
         bleDataExporter = BleDataExporter(this)
         savedFileManager = SavedFileManager(this)
         
@@ -165,6 +170,11 @@ class MainActivity : AppCompatActivity() {
             showCompanyFilterDialog()
         }
         
+        // 보기 모드 전환 버튼 설정
+        binding.viewModeButton.setOnClickListener {
+            toggleViewMode()
+        }
+        
         // 초기 상태 설정
         updateScanButton(false)
     }
@@ -191,27 +201,63 @@ class MainActivity : AppCompatActivity() {
         val devices = bleScanner.getDiscoveredDevices()
         allDeviceGroups = groupDevicesByCompany(devices)
         
-        // 필터링 적용
-        val filteredGroups = if (selectedCompanies.isEmpty()) {
-            allDeviceGroups
+        if (isTableView) {
+            // 표 형식 보기
+            val filteredDevices = if (selectedCompanies.isEmpty()) {
+                devices
+            } else {
+                devices.filter { device ->
+                    selectedCompanies.contains(device.getCompanyName().split(" (")[0])
+                }
+            }
+            tableDeviceAdapter.updateDevices(filteredDevices)
+            
+            val totalDevices = devices.size
+            val filteredCount = filteredDevices.size
+            
+            if (selectedCompanies.isEmpty()) {
+                binding.deviceCountText.text = "발견된 기기: ${totalDevices}개"
+            } else {
+                binding.deviceCountText.text = "표시된 기기: ${filteredCount}개 / 전체: ${totalDevices}개"
+            }
         } else {
-            allDeviceGroups.filter { group ->
-                selectedCompanies.contains(group.companyName)
+            // 그룹 형식 보기
+            val filteredGroups = if (selectedCompanies.isEmpty()) {
+                allDeviceGroups
+            } else {
+                allDeviceGroups.filter { group ->
+                    selectedCompanies.contains(group.companyName)
+                }
+            }
+            
+            deviceAdapter.updateDeviceGroups(filteredGroups)
+            
+            val totalDevices = devices.size
+            val totalCompanies = allDeviceGroups.size
+            val filteredDevices = filteredGroups.sumOf { it.deviceCount }
+            val filteredCompanies = filteredGroups.size
+            
+            if (selectedCompanies.isEmpty()) {
+                binding.deviceCountText.text = "발견된 기기: ${totalDevices}개 (${totalCompanies}개 회사)"
+            } else {
+                binding.deviceCountText.text = "표시된 기기: ${filteredDevices}개 (${filteredCompanies}개 회사) / 전체: ${totalDevices}개"
             }
         }
+    }
+    
+    private fun toggleViewMode() {
+        isTableView = !isTableView
         
-        deviceAdapter.updateDeviceGroups(filteredGroups)
-        
-        val totalDevices = devices.size
-        val totalCompanies = allDeviceGroups.size
-        val filteredDevices = filteredGroups.sumOf { it.deviceCount }
-        val filteredCompanies = filteredGroups.size
-        
-        if (selectedCompanies.isEmpty()) {
-            binding.deviceCountText.text = "발견된 기기: ${totalDevices}개 (${totalCompanies}개 회사)"
+        if (isTableView) {
+            binding.deviceList.adapter = tableDeviceAdapter
+            binding.viewModeButton.text = "그룹 보기"
         } else {
-            binding.deviceCountText.text = "표시된 기기: ${filteredDevices}개 (${filteredCompanies}개 회사) / 전체: ${totalDevices}개"
+            binding.deviceList.adapter = deviceAdapter
+            binding.viewModeButton.text = "표 보기"
         }
+        
+        updateDeviceList()
+        showToast(if (isTableView) "표 형식으로 변경되었습니다" else "그룹 형식으로 변경되었습니다")
     }
     
     private fun groupDevicesByCompany(devices: List<BleDevice>): List<DeviceGroup> {
@@ -452,7 +498,7 @@ class MainActivity : AppCompatActivity() {
         
         fileCountText.text = "저장된 파일: ${savedFiles.size}개"
         
-        val fileAdapter = SavedFileAdapter(
+        val fileAdapter = SavedFileTableAdapter(
             files = savedFiles,
             onFileClick = { file -> showFileContentDialog(file) },
             onFileLongClick = { file -> showDeleteFileDialog(file) }
@@ -477,12 +523,60 @@ class MainActivity : AppCompatActivity() {
             return
         }
         
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_file_content, null)
+        // 파일 내용을 BLE 기기 데이터로 파싱
+        val devices = FileContentParser.parseFileContent(content, file.type)
+        
+        // 디버깅용 로그
+        android.util.Log.d("FileContentParser", "File type: ${file.type}")
+        android.util.Log.d("FileContentParser", "Content preview: ${content.take(200)}")
+        android.util.Log.d("FileContentParser", "Parsed devices count: ${devices?.size ?: 0}")
+        
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_file_content_table, null)
         val fileTitle = dialogView.findViewById<TextView>(R.id.fileTitle)
-        val fileContent = dialogView.findViewById<TextView>(R.id.fileContent)
+        val deviceCountText = dialogView.findViewById<TextView>(R.id.deviceCountText)
+        val deviceTableList = dialogView.findViewById<RecyclerView>(R.id.deviceTableList)
+        val textContentContainer = dialogView.findViewById<ScrollView>(R.id.textContentContainer)
+        val fileContentText = dialogView.findViewById<TextView>(R.id.fileContent)
+        val viewModeToggle = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.viewModeToggle)
         
         fileTitle.text = file.displayName
-        fileContent.text = content
+        fileContentText.text = content
+        
+        var isTableView = true
+        
+        if (devices != null && devices.isNotEmpty()) {
+            // 표 형식으로 표시
+            deviceCountText.text = "기기 수: ${devices.size}개"
+            
+            val tableAdapter = TableDeviceAdapter()
+            tableAdapter.updateDevices(devices)
+            
+            deviceTableList.layoutManager = LinearLayoutManager(this)
+            deviceTableList.adapter = tableAdapter
+            
+            // 보기 모드 전환 버튼
+            viewModeToggle.setOnClickListener {
+                isTableView = !isTableView
+                if (isTableView) {
+                    deviceTableList.visibility = View.VISIBLE
+                    deviceCountText.visibility = View.VISIBLE
+                    textContentContainer.visibility = View.GONE
+                    viewModeToggle.text = "텍스트 보기"
+                } else {
+                    deviceTableList.visibility = View.GONE
+                    deviceCountText.visibility = View.GONE
+                    textContentContainer.visibility = View.VISIBLE
+                    viewModeToggle.text = "표 보기"
+                }
+            }
+        } else {
+            // 파싱 실패 시 텍스트로만 표시
+            deviceTableList.visibility = View.GONE
+            deviceCountText.visibility = View.GONE
+            textContentContainer.visibility = View.VISIBLE
+            viewModeToggle.visibility = View.GONE
+            showToast("파일 파싱에 실패했습니다. 텍스트로 표시합니다.")
+        }
         
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
